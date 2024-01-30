@@ -1,4 +1,4 @@
-# fib-index
+# low-cred-superspreaders
 
 Code repository for the paper, "Identifying and characterizing superspreaders\\of low-credibility content on Twitter."
 - Authors: [Matthew R. DeVerna](https://www.matthewdeverna.com), [Rachith Aiyappa](https://rachithaiyappa.github.io/), [Diogo Pacheco](https://computerscience.exeter.ac.uk/staff/dp503?sm=dp503), John Bryden, and [Filippo Menczer](https://cnets.indiana.edu/fil/)

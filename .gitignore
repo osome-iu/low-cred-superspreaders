@@ -130,3 +130,5 @@ dmypy.json
 
 # Manual additions
 .vscode
+private/
+.DS_Store

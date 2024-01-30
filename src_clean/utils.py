@@ -24,11 +24,12 @@ IMPORTANT:
 import argparse
 import configparser
 import datetime
-import logging
 import os
 
 import numpy as np
 import pandas as pd
+
+from numpy import std, mean, sqrt
 
 
 def err_msg_w_path(path):
@@ -46,9 +47,9 @@ class Loader:
 
     def __init__(self):
         # User data from jan/feb decahose data
-        # self._user_data_decahose = "../data/clean_account_data_decahose.pickle"
-        # if not os.path.exists(self._user_data_decahose):
-        #     raise Exception(err_msg_w_path(self._user_data_decahose))
+        self._user_data_decahose = "../data/private/clean_account_data_decahose.pickle"
+        if not os.path.exists(self._user_data_decahose):
+            raise Exception(err_msg_w_path(self._user_data_decahose))
 
         # User data from V2
         self._user_data = "../data/clean_account_data.csv"
@@ -68,7 +69,7 @@ class Loader:
             raise Exception(err_msg_w_path(self._iffyp_top_inf_fib_path))
 
         # Iffy+ Jan through October tweet data (from Decahose)
-        # self._iffyp_jan_oct_path = "../data/iffyp_jan-oct_all_clean--2021-07-07.pickle"
+        # self._iffyp_jan_oct_path = "../data/private/iffyp_jan-oct_all_clean--2021-07-07.pickle"
         # if not os.path.exists(self._iffyp_jan_oct_path):
         #     raise Exception(err_msg_w_path(self._iffyp_jan_oct_path))
 
@@ -259,7 +260,7 @@ class Loader:
             raise Exception(
                 "We cannot share this data. Please rehydrate and update the function."
             )
-            return pd.read_pickle(self._user_data_decahose)
+            # return pd.read_pickle(self._user_data_decahose)
 
         # if `v2`, we also need to parse, which info_type we want
         elif name == "v2":
@@ -391,3 +392,93 @@ def convert_twitter_strings_2_dates(date):
             raise TypeError(f"input type ({type(date)}) needs to be str.\n{e}")
     except Exception as e:
         raise Exception(f"Unknown error.\n\n{e}")
+
+
+def cohen_d(x, y):
+    """
+    Calculate cohen's d based on sampled x and y data.
+    See: https://en.wikipedia.org/wiki/Effect_size#Cohen's_d
+    """
+    nx = len(x)
+    ny = len(y)
+    dof = nx + ny - 2
+    return (mean(x) - mean(y)) / sqrt(
+        ((nx - 1) * std(x, ddof=1) ** 2 + (ny - 1) * std(y, ddof=1) ** 2) / dof
+    )
+
+
+# Define the bootstrap function
+def bootstrap_ci(array, confidence=0.95, n_samples=5_000, d_only=True):
+    """
+    Calculate a confidence interval for sample data via bootstrapping
+
+    Parameters:
+    -----------
+    - array (of ints/floats): the sample data
+    - confidence (float): the desired level of confidence (default=0.95)
+    - n_samples (float): number of bootstrap samples
+    - distance_only (bool): If True, return only half the distance between the
+        upper and lower bounds
+
+    Returns:
+    -----------
+    - if d_only = False (tuple): The lower and upper bounds of the confidence interval.
+    - if d_only = True (float, Default): Distance from the mean based on SEM 95% CI
+    """
+    # Ignore NaN values
+    array = [val for val in array if not np.isnan(val)]
+    n = len(array)
+    bootstrapped_means = []
+    for _ in range(n_samples):
+        bootstrap_sample = np.random.choice(array, n)
+        bootstrapped_means.append(np.mean(bootstrap_sample))
+    alpha = (1 - confidence) / 2
+    lower_bound = np.percentile(bootstrapped_means, alpha * 100)
+    upper_bound = np.percentile(bootstrapped_means, (1 - alpha) * 100)
+    if d_only:
+        h = (upper_bound - lower_bound) / 2
+        return h
+    return (lower_bound, upper_bound)
+
+
+def mean_diff_bootstrap_ci(
+    array1, array2, confidence=0.95, n_samples=5_000, d_only=True
+):
+    """
+    Calculate a confidence interval for a MannWhitneyU comparison, i.e., bounds
+    for the avg. median difference.
+
+    Parameters:
+    -----------
+    - array1 (of ints/floats): the sample data from group 1
+    - array2 (of ints/floats): the sample data from group 2
+    - confidence (float): the desired level of confidence (default=0.95)
+    - n_samples (float): number of bootstrap samples
+    - distance_only (bool): If True, return only half the distance between the
+        upper and lower bounds
+
+    Returns:
+    -----------
+    - if d_only = False (tuple): The lower and upper bounds of the confidence interval.
+    - if d_only = True (float, Default): Distance from the mean based on SEM 95% CI
+    """
+    # Ignore NaN values
+    array1 = [val for val in array1 if not np.isnan(val)]
+    array2 = [val for val in array2 if not np.isnan(val)]
+    n1 = len(array1)
+    n2 = len(array2)
+    bootstrapped_diffs = []
+    for _ in range(n_samples):
+        bootstrap_sample1 = np.random.choice(array1, n1)
+        bootstrap_sample2 = np.random.choice(array2, n2)
+        bootstrapped_diffs.append(
+            np.mean(bootstrap_sample1) - np.mean(bootstrap_sample2)
+        )
+
+    alpha = (1 - confidence) / 2
+    lower_bound = np.percentile(bootstrapped_diffs, alpha * 100)
+    upper_bound = np.percentile(bootstrapped_diffs, (1 - alpha) * 100)
+    if d_only:
+        h = (upper_bound - lower_bound) / 2
+        return h
+    return (lower_bound, upper_bound)
